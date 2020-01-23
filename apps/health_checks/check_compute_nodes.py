@@ -184,15 +184,16 @@ if args.mem_bw_tests:
     # Check for low memory bandwidth
     # loop through the nodes to find nodes with poor latency
     hosts = {}
-    if len(out_lines) > 1:
+    if len(out_lines) == 1 and out_lines[0] == "":
         print("All {} nodes passed the memory bandwidth test".format(len(nodes)))
-    for line in out_lines:
-        tmp = line.split()
-        if len(tmp) is 0:
-            continue
-        host = tmp[1].strip()
-        value = tmp[3].strip()
-        print("{} failed memory bandwidth test: {} MB/s".format(host, value))
-        offline_nodes.append([host, "low memory bandwidth - {} MB/s".format(value)])
+    else:
+        for line in out_lines:
+            tmp = line.split()
+            if len(tmp) is 0:
+                continue
+            host = tmp[1].strip()
+            value = tmp[3].strip()
+            print("{} failed memory bandwidth test: {} MB/s".format(host, value))
+            offline_nodes.append([host, "low memory bandwidth - {} MB/s".format(value)])
 
 print("Offline nodes: {}".format(offline_nodes))
