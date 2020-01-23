@@ -58,6 +58,7 @@ def wait_for_jobs_to_finish(check_text):
         remaining_jobs = int(output)
         print("Remaining Jobs: {:05d}".format(remaining_jobs), end="\r")
         if remaining_jobs == 0:
+            print()
             break
         time.sleep(5)
 
@@ -164,12 +165,13 @@ print("Recheck nodes: {}".format(recheck_nodes))
 
 
 if args.mem_bw_tests:
+    print("Run memory bw tests")
     nodes = list(node_dict.keys())
     for node in nodes:
         qsub_cmd = "qsub -N mem_bw_test -l select=1:ncpus=1:host={} -l place=excl -joe ~/apps/health_checks/run_mem_bw_test.sh".format(node_dict[node]["host"])
         output = check_output(qsub_cmd, shell=True)
-        output = output.decode()
-        print(output)
+        output = output.decode().strip()
+#        print(output)
 
     # Wait for the jobs to finish 
     wait_for_jobs_to_finish("mem_bw_test")
@@ -182,7 +184,8 @@ if args.mem_bw_tests:
     # Check for low memory bandwidth
     # loop through the nodes to find nodes with poor latency
     hosts = {}
-    if 
+    if len(out_lines) > 1:
+        print("All {} nodes passed the memory bandwidth test".format(len(nodes)))
     for line in out_lines:
         tmp = line.split()
         if len(tmp) is 0:
