@@ -164,15 +164,12 @@ print("Recheck nodes: {}".format(recheck_nodes))
 
 
 if args.mem_bw_tests:
-    for node in enumerate(nodes):
-        qsub_cmd = "qsub -N mem_bw_test -l select=1:ncpus=1:host={} -l place=excl -joe ~/apps/health_checks/run_mem_bw_test.sh".format(nodes[node]["host"])
-        cmd = qsub_cmd.split()
-        print("CMD: {}".format(cmd))
-        status, output = run_cmd(cmd)
-        tmp = output.decode()
-        tmp = tmp.split("\n")
-        print("Status: {}".format(status))
-        print("Output: {}".format(type(tmp)))
+    nodes = list(node_dict.keys())
+    for node in nodes:
+        qsub_cmd = "qsub -N mem_bw_test -l select=1:ncpus=1:host={} -l place=excl -joe ~/apps/health_checks/run_mem_bw_test.sh".format(node_dict[node]["host"])
+        output = check_output(qsub_cmd, shell=True)
+        output = output.decode()
+        print(output)
 
     # Wait for the jobs to finish 
     wait_for_jobs_to_finish("mem_bw_test")
