@@ -165,7 +165,7 @@ print("Recheck nodes: {}".format(recheck_nodes))
 
 if args.mem_bw_tests:
     for node in enumerate(nodes):
-        qsub_cmd = "qsub -N mem_bw_test -l select=1:ncpus=1:host={} -l place=excl -joe ~/apps/health_checks/run_mem_bw_test.sh".format(node, node)
+        qsub_cmd = "qsub -N mem_bw_test -l select=1:ncpus=1:host={} -l place=excl -joe ~/apps/health_checks/run_mem_bw_test.sh".format(nodes[node]["host"])
         cmd = qsub_cmd.split()
         print("CMD: {}".format(cmd))
         status, output = run_cmd(cmd)
@@ -185,7 +185,7 @@ if args.mem_bw_tests:
     # Check for low memory bandwidth
     # loop through the nodes to find nodes with poor latency
     hosts = {}
-    for line in check_lines:
+    for line in out_lines:
         tmp = line.split()
         if len(tmp) is 0:
             continue
