@@ -37,7 +37,7 @@ elif args.vm_type.lower() == "hbv2":
     bibw_value = 15000
 
 def run_latency_test(node1, node2, queue):
-    qsub_cmd = "qsub -N osu_bw_test -l select=1:ncpus=1:mem=10gb:host={}+1:ncpus=1:mem=10gb:host={} -l place=excl ~/apps/health_checks/run_ring_osu_bw_hpcx.pbs".format(node1, node2)
+    qsub_cmd = "qsub -N osu_bw_test -joe -l select=1:ncpus=1:mem=10gb:host={}+1:ncpus=1:mem=10gb:host={} -l place=excl ~/apps/health_checks/run_ring_osu_bw_hpcx.pbs".format(node1, node2)
     cmd=qsub_cmd.split()
     if queue != None:
         cmd.insert(1,"-q")
@@ -137,7 +137,7 @@ if args.ib_tests:
     wait_for_jobs_to_finish("osu_bw_test")
 
     # Process results
-    output = check_output('grep -T "^8 " *latency* | sort -n -k 2', shell=True)
+    output = check_output('grep -T "^8 " mem_bw_test.o** | sort -n -k 2', shell=True)
     output = output.decode()
     out_lines = output.split("\n")
 
