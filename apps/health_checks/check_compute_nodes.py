@@ -3,24 +3,27 @@
 import argparse
 from subprocess import Popen, PIPE, check_output
 import json
-import pprint
 import os, sys
 import time
 import datetime
+import logging
 
 parser = argparse.ArgumentParser(prog='PROG', usage='%(prog)s [options]')
 parser.add_argument("-q", type=str, help="PBS Queue to evaluate")
+parser.add_argument("--debug", action="store_true", help="Print extra information to stdout")
 parser.add_argument("--all_nodes", action="store_true", help="Check all nodes known to PBS")
 parser.add_argument("--ib_tests", action="store_true", help="Run all of the IB tests")
 parser.add_argument("--mem_bw_tests", action="store_true", help="Run a memory bandwidth test on all of the nodes")
 parser.add_argument("--vm_type", type=str, default=None, help="Ex) --vm_type=hbv2")
 args = parser.parse_args()
 
-print("Queue: {}".format(args.q))
-print("All nodes: {}".format(args.all_nodes))
-print("IB tests: {}".format(args.ib_tests))
-print("Mem BW tests: {}".format(args.mem_bw_tests))
-print("VM type: {}".format(args.vm_type))
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+
+logging.info("Queue: {}".format(args.q))
+logging.info("All nodes: {}".format(args.all_nodes))
+logging.info("IB tests: {}".format(args.ib_tests))
+logging.info("Mem BW tests: {}".format(args.mem_bw_tests))
+logging.info("VM type: {}".format(args.vm_type))
 
 # Define the cut off values for different sku types 
 if args.vm_type == None:
@@ -30,26 +33,16 @@ elif args.vm_type.lower() == "hbv2":
     cutoff_latency = 1.8
     bibw_value = 15000
 
-def run_cmd(cmd, debug=False):
-    p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-    output, err = p.communicate()
-    status = p.returncode
-
-    if debug is True:
-        print("Output: ", output)
-        print("Error: ", err)
-        print("RC: ", status)
-    return((status, output))
-
 def run_latency_test(node1, node2, queue):
     qsub_cmd = "qsub -N osu_bw_test -l select=1:ncpus=1:mem=10gb:host={}+1:ncpus=1:mem=10gb:host={} -l place=excl ~/apps/health_checks/run_ring_osu_bw_hpcx.pbs".format(node1, node2)
     cmd=qsub_cmd.split()
     if queue != None:
         cmd.insert(1,"-q")
         cmd.insert(2, queue)
-    print("Qsub cmd: {}".format(" ".join(cmd)))
+    logging.debug("Qsub cmd: {}".format(" ".join(cmd)))
     output = check_output(" ".join(cmd), shell=True)
-    print(output)
+    output = output.decode().strip()
+    loggin.debug(output)
 
 def wait_for_jobs_to_finish(check_text):
     # Wait for jobs to finish
@@ -72,7 +65,7 @@ def check_nodes_for_ib_issues(check_lines, check_type, cutoff_value):
         host1 = tmp[0].split("_")[0]
         host2 = tmp[0].split("_")[2]
         value = tmp[-1].strip()
-        print("Host 1: {}, Host 2: {}, {} Value: {}".format(host1, host2, check_type, value))
+        logging.debug("Host 1: {}, Host 2: {}, {} Value: {}".format(host1, host2, check_type, value))
         ib_results[host1] = {host2: {check_type: value}}
 
         check_results = False
@@ -96,28 +89,25 @@ def check_nodes_for_ib_issues(check_lines, check_type, cutoff_value):
 
 # Find all nodes
 pbsnodes_cmd = "/opt/pbs/bin/pbsnodes -avS | grep free"
-cmd=pbsnodes_cmd.split()
-
-print("CMD: {}".format(cmd))
-status, output = run_cmd(cmd)
-tmp = output.decode()
-tmp = tmp.split("\n")
-print("Status: {}".format(status))
-print("Output: {}".format(type(tmp)))
+logging.debug("Find nodes cmd: {}".format(pbsnodes_cmd))
+output = check_output(pbsnodes_cmd, shell=True)
+output = output.decode().strip()
+tmp = output.split("\n")
+logging.info("Output: {}".format(tmp))
 node_dict = dict()
 for line in tmp[2:]:
-    print("Output: {}".format(line))
+    if args.debug:
+        logging.info("Output: {}".format(line))
     if line == "":
         continue
     data = line.split()
     node_dict[data[0]] = {"state": data[1], "host": data[4], "queue": data[5]}
 
-print("{}".format(node_dict))
-
 nodes = list(node_dict.keys())
-print("Keys: {}".format(nodes))
 num_of_nodes = len(nodes)
-print("# of Nodes: {}".format(num_of_nodes))
+logging.debug("# of Nodes: {}".format(num_of_nodes))
+logging.debug("Nodes: {}".format(nodes))
+logging.debug("{}".format(node_dict))
 
 # Make dir to store results
 new_dir = os.path.join(os.getcwd(), datetime.datetime.now().strftime('Health_tests_%Y%m%d_%H%M%S'))
@@ -129,14 +119,14 @@ ib_results = dict()
 offline_nodes = list()
 recheck_nodes = list()
 if args.ib_tests:
-    print("Run IB tests")
+    logging.info("Run IB tests")
     for n_cnt, node in enumerate(nodes):
         node1=node_dict[node]["host"]
         if n_cnt+1 == num_of_nodes:
             node2 = node_dict[nodes[0]]["host"]
         else:
             node2 = node_dict[nodes[n_cnt+1]]["host"]
-        #print("Node1: {}, Node2: {}".format(node1, node2))
+        logging.debug("Node1: {}, Node2: {}".format(node1, node2))
         run_latency_test(node1, node2, args.q)
         time.sleep(0.2)
 
@@ -150,28 +140,28 @@ if args.ib_tests:
 
     # Check IB for slow latency
     suspect_hosts["latency"] = check_nodes_for_ib_issues(out_lines, "latency", cutoff_latency)
-    print("Slow latency hosts: {}".format(suspect_hosts["latency"]))
+    logging.info("Slow latency hosts: {}".format(suspect_hosts["latency"]))
 
     # Check to see if same host was involved in two slow runs
     for host in suspect_hosts["latency"]:
         if suspect_hosts["latency"][host] > 1:
-            #print("Offline host: {}".format(host))
+            logging.warn("Offline host: {}".format(host))
             offline_nodes.append([host, "Slow latency"])
         else:
-            print("Run an additional test on host {} to check".format(host))
+            logging.info("Run an additional test on host {} to check".format(host))
             recheck_nodes.append([host, "latency"])
     
-print("Recheck nodes: {}".format(recheck_nodes))
+logging.debug("Recheck nodes: {}".format(recheck_nodes))
 
 
 if args.mem_bw_tests:
-    print("Run memory bw tests")
+    logging.info("Run memory bw tests")
     nodes = list(node_dict.keys())
     for node in nodes:
         qsub_cmd = "qsub -N mem_bw_test -l select=1:ncpus=1:host={} -l place=excl -joe ~/apps/health_checks/run_mem_bw_test.sh".format(node_dict[node]["host"])
         output = check_output(qsub_cmd, shell=True)
         output = output.decode().strip()
-#        print(output)
+        logging.debug(output)
 
     # Wait for the jobs to finish 
     wait_for_jobs_to_finish("mem_bw_test")
@@ -185,7 +175,7 @@ if args.mem_bw_tests:
     # loop through the nodes to find nodes with poor latency
     hosts = {}
     if len(out_lines) == 1 and out_lines[0] == "":
-        print("All {} nodes passed the memory bandwidth test".format(len(nodes)))
+        logging.info("All {} nodes passed the memory bandwidth test".format(len(nodes)))
     else:
         for line in out_lines:
             tmp = line.split()
@@ -193,7 +183,7 @@ if args.mem_bw_tests:
                 continue
             host = tmp[1].strip()
             value = tmp[3].strip()
-            print("{} failed memory bandwidth test: {} MB/s".format(host, value))
+            logging.warn("{} failed memory bandwidth test: {} MB/s".format(host, value))
             offline_nodes.append([host, "low memory bandwidth - {} MB/s".format(value)])
 
-print("Offline nodes: {}".format(offline_nodes))
+logging.info("Offline nodes: {}".format(offline_nodes))
