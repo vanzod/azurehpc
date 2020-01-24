@@ -31,10 +31,10 @@ logging.info("VM type: {}".format(args.vm_type))
 # Define the cut off values for different sku types 
 if args.vm_type == None:
     cutoff_latency = 3.0
-    bibw_value = 7000
+    cutoff_bibw = 7000
 elif args.vm_type.lower() == "hbv2":
-    cutoff_latency = 1.8
-    bibw_value = 15000
+    cutoff_latency = 2.4
+    cutoff_bibw = 15000
 
 def run_latency_test(node1, node2, queue):
     qsub_cmd = "qsub -N osu_bw_test -joe -l select=1:ncpus=1:mem=10gb:host={}+1:ncpus=1:mem=10gb:host={} -l place=excl ~/apps/health_checks/run_ring_osu_bw_hpcx.pbs".format(node1, node2)
@@ -150,14 +150,14 @@ if args.ib_tests:
     # Check to see if same host was involved in two slow runs
     for host in suspect_hosts["latency"]:
         if suspect_hosts["latency"][host] > 1:
-            logging.warn("Offline host: {}".format(host))
+            logging.warning("Offline host: {}".format(host))
             offline_nodes.append([host, "Slow latency"])
         else:
             logging.info("Run an additional test on host {} to check".format(host))
             recheck_nodes.append([host, "latency"])
 
     # Process bibw results
-    output = check_output('grep -T "^8 " *osu_bw* | sort -n -k 2', shell=True)
+    output = check_output('grep -T "^4194304 " *osu_bw.log | sort -n -k 2', shell=True)
     output = output.decode()
     out_lines = output.split("\n")
 
@@ -168,7 +168,7 @@ if args.ib_tests:
     # Check to see if same host was involved in two low bandwidth runs
     for host in suspect_hosts["bibw"]:
         if suspect_hosts["bibw"][host] > 1:
-            logging.warn("Offline host: {}".format(host))
+            logging.warning("Offline host: {}".format(host))
             offline_nodes.append([host, "low ib bandwidth"])
         else:
             logging.info("Run an additional test on host {} to check ib bandwidth".format(host))
