@@ -113,9 +113,11 @@ logging.debug("Nodes: {}".format(nodes))
 logging.debug("{}".format(node_dict))
 
 # Make dir to store results
+logging.debug("CWD: {}".format(os.getcwd()))
 new_dir = os.path.join(os.getcwd(), datetime.datetime.now().strftime('Health_tests_%Y%m%d_%H%M%S'))
 os.makedirs(new_dir)
 os.chdir(new_dir)
+logging.debug("CWD: {}".format(os.getcwd()))
 
 suspect_hosts = {"latency": {}, "bandwidth": {}}
 ib_results = dict()
@@ -136,8 +138,8 @@ if args.ib_tests:
     # Wait for ib jobs to complete
     wait_for_jobs_to_finish("osu_bw_test")
 
-    # Process results
-    output = check_output('grep -T "^8 " mem_bw_test.o** | sort -n -k 2', shell=True)
+    # Process latency results
+    output = check_output('grep -T "^8 " *osu_latency* | sort -n -k 2', shell=True)
     output = output.decode()
     out_lines = output.split("\n")
 
@@ -153,6 +155,39 @@ if args.ib_tests:
         else:
             logging.info("Run an additional test on host {} to check".format(host))
             recheck_nodes.append([host, "latency"])
+
+    # Process bibw results
+    output = check_output('grep -T "^8 " *osu_bw* | sort -n -k 2', shell=True)
+    output = output.decode()
+    out_lines = output.split("\n")
+
+    # Check IB for slow latency
+    suspect_hosts["bibw"] = check_nodes_for_ib_issues(out_lines, "bibw", cutoff_bibw)
+    logging.info("low ib bandwidth hosts: {}".format(suspect_hosts["bibw"]))
+
+    # Check to see if same host was involved in two low bandwidth runs
+    for host in suspect_hosts["bibw"]:
+        if suspect_hosts["bibw"][host] > 1:
+            logging.warn("Offline host: {}".format(host))
+            offline_nodes.append([host, "low ib bandwidth"])
+        else:
+            logging.info("Run an additional test on host {} to check ib bandwidth".format(host))
+            recheck_nodes.append([host, "bibw"])
+    
+    # Process output file results
+    output = check_output('grep -T "IB0 Error:" osu_bw_test.o* | sort -n -k 2', shell=True)
+    output = output.decode()
+    out_lines = output.split("\n")
+
+    # Check for ib0 on host
+    if len(out_lines) == 1 and out_lines[0] == "":
+        logging.info("All nodes have ib0 reporting in")
+    else:
+        for line in out_lines:
+            tmp = line.split()
+            host = tmp[2]
+            logging.warn("Offline host: {}".format(host))
+            offline_nodes.append([host, "no ib0"])
     
 logging.debug("Recheck nodes: {}".format(recheck_nodes))
 

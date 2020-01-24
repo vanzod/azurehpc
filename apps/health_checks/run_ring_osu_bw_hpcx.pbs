@@ -1,5 +1,4 @@
 #!/bin/bash
-#
 
 cd $PBS_O_WORKDIR
 
@@ -11,21 +10,21 @@ dst=$(head -n1 $PBS_NODEFILE)
 echo "host1: $src"
 echo "host2: $dst"
 
-host1_ib0=`           /sbin/ifconfig | grep -a2  ib0 | grep "inet 172" 2>/dev/null | awk '{print $2}'`
+host1_ib0=`         /sbin/ifconfig | grep -a2  ib0 | grep "inet 172" 2>/dev/null | awk '{print $2}'`
 host2_ib0=`ssh $src /sbin/ifconfig | grep -a2  ib0 | grep "inet 172" 2>/dev/null | awk '{print $2}'`
 echo "host1 ib0: $host1_ib0"
 echo "host2 ib0: $host2_ib0"
 
 if [ "$host1_ib0" == "" ]; then
-    echo "IB Test Error: $dst is missing ib0"
+    echo "IB Error: $dst is missing ib0"
     exit -1
 fi
 if [ "$host2_ib0" == "" ]; then
-    echo "IB Test Error:  $src" is missing ib0
+    echo "IB Error:  $src" is missing ib0
     exit -1
 fi
 
 src=$(tail -n1 $PBS_NODEFILE)
 dst=$(head -n1 $PBS_NODEFILE)
-mpirun -np 2 --host $src,$dst --map-by node $HPCX_OSU_DIR/osu_latency | tee ${src}_to_${dst}_osu_latency.log_$$
-mpirun -np 2 --host $src,$dst --map-by node $HPCX_OSU_DIR/osu_bibw | tee ${src}_to_${dst}_osu_bw.log_$$
+mpirun -np 2 --host $src,$dst --map-by node $HPCX_OSU_DIR/osu_latency | tee ${src}_to_${dst}_osu_latency.log
+mpirun -np 2 --host $src,$dst --map-by node $HPCX_OSU_DIR/osu_bibw | tee ${src}_to_${dst}_osu_bw.log
