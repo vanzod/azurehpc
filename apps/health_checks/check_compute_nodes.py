@@ -17,7 +17,10 @@ parser.add_argument("--mem_bw_tests", action="store_true", help="Run a memory ba
 parser.add_argument("--vm_type", type=str, default=None, help="Ex) --vm_type=hbv2")
 args = parser.parse_args()
 
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+if args.debug:
+    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+else:
+    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
 logging.info("Queue: {}".format(args.q))
 logging.info("All nodes: {}".format(args.all_nodes))
@@ -42,7 +45,7 @@ def run_latency_test(node1, node2, queue):
     logging.debug("Qsub cmd: {}".format(" ".join(cmd)))
     output = check_output(" ".join(cmd), shell=True)
     output = output.decode().strip()
-    loggin.debug(output)
+    logging.debug(output)
 
 def wait_for_jobs_to_finish(check_text):
     # Wait for jobs to finish
@@ -97,7 +100,7 @@ logging.info("Output: {}".format(tmp))
 node_dict = dict()
 for line in tmp[2:]:
     if args.debug:
-        logging.info("Output: {}".format(line))
+        logging.debug("Output: {}".format(line))
     if line == "":
         continue
     data = line.split()
