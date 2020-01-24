@@ -96,7 +96,7 @@ logging.debug("Find nodes cmd: {}".format(pbsnodes_cmd))
 output = check_output(pbsnodes_cmd, shell=True)
 output = output.decode().strip()
 tmp = output.split("\n")
-logging.info("Output: {}".format(tmp))
+logging.debug("Output: {}".format(tmp))
 node_dict = dict()
 for line in tmp[2:]:
     if args.debug:
