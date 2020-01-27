@@ -269,7 +269,7 @@ if __name__ == "__main__":
 
         # Check to see if same host was involved in two low bandwidth runs
         for host in hosts_results["bibw"]:
-            if hosts_results["bibw"][host] > 1:
+            if "failures" in hosts_results["bibw"][host] and hosts_results["bibw"][host]["failures"] == True:
                 logging.warning("Offline host: {}".format(host))
                 offline_nodes.append([host, "low ib bandwidth"])
             else:
