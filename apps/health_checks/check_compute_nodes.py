@@ -72,10 +72,10 @@ def wait_for_jobs_to_finish(check_text=None, wlm=None):
         return False
     job_cnt = -1
     while job_cnt != 0 and wlm == "pbs":
-        print("Ready to check output")
+        logging.debug("Ready to check output")
         output = check_output("/opt/pbs/bin/qstat -aw | grep {} | wc -l".format(check_text), shell=True)
         job_cnt = int(output)
-        print("Job Count: {}".format(job_cnt))
+        logging.debug("Job Count: {}".format(job_cnt))
         print("Remaining Jobs: {:05d}".format(job_cnt), end="\r")
         if job_cnt == 0:
             print()
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     os.chdir(new_dir)
     logging.debug("CWD: {}".format(os.getcwd()))
 
-    suspect_hosts = {"latency": {}, "bandwidth": {}}
+    hosts_results = {"latency": {}, "bandwidth": {}}
     ib_results = dict()
     offline_nodes = list()
     recheck_nodes = list()
@@ -247,12 +247,12 @@ if __name__ == "__main__":
         output = output.decode()
 
         # Check IB for slow latency
-        suspect_hosts["latency"] = check_nodes_for_ib_issues(output, "latency", cutoff_latency)
-        logging.info("Slow latency hosts: {}".format(suspect_hosts["latency"]))
+        hosts_results["latency"] = check_nodes_for_ib_issues(output, "latency", cutoff_latency)
+        logging.info("Latency results: {}".format(hosts_results["latency"]))
 
         # Check to see if same host was involved in two slow runs
-        for host in suspect_hosts["latency"]:
-            if suspect_hosts["latency"][host] > 1:
+        for host in hosts_results["latency"]:
+            if "failures" in hosts_results["latency"][host] and hosts_results["latency"][host]["failures"] > 1:
                 logging.warning("Offline host: {}".format(host))
                 offline_nodes.append([host, "Slow latency"])
             else:
@@ -264,12 +264,12 @@ if __name__ == "__main__":
         output = output.decode()
 
         # Check IB for slow latency
-        suspect_hosts["bibw"] = check_nodes_for_ib_issues(output, "bibw", cutoff_bibw)
-        logging.info("low ib bandwidth hosts: {}".format(suspect_hosts["bibw"]))
+        hosts_results["bibw"] = check_nodes_for_ib_issues(output, "bibw", cutoff_bibw)
+        logging.info("low ib bandwidth hosts: {}".format(hosts_results["bibw"]))
 
         # Check to see if same host was involved in two low bandwidth runs
-        for host in suspect_hosts["bibw"]:
-            if suspect_hosts["bibw"][host] > 1:
+        for host in hosts_results["bibw"]:
+            if hosts_results["bibw"][host] > 1:
                 logging.warning("Offline host: {}".format(host))
                 offline_nodes.append([host, "low ib bandwidth"])
             else:
