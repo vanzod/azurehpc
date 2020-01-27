@@ -1,7 +1,5 @@
 #!/bin/bash
-VM_SKU=$(curl --connect-timeout 10 -s -H Metadata:true "http://169.254.169.254/metadata/instance?api-version=2018-04-02" | jq '.compute.vmSize')
-VM_SKU="${VM_SKU%\"}"
-VM_SKU="${VM_SKU#\"}"
+VM_SKU=$(curl --connect-timeout 10 -s -H Metadata:true "http://169.254.169.254/metadata/instance?api-version=2018-04-02" | jq -r '.compute.vmSize')
 
 host=$(hostname)
 

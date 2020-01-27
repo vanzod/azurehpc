@@ -252,7 +252,9 @@ if __name__ == "__main__":
 
         # Check to see if same host was involved in two slow runs
         for host in hosts_results["latency"]:
-            if "failures" in hosts_results["latency"][host] and hosts_results["latency"][host]["failures"] > 1:
+            if "failures" not in hosts_results["latency"][host]:
+                logging.debug("{} passed latency check")
+            elif "failures" in hosts_results["latency"][host] and hosts_results["latency"][host]["failures"] > 1:
                 logging.warning("Offline host: {}".format(host))
                 offline_nodes.append([host, "Slow latency"])
             else:
@@ -269,12 +271,11 @@ if __name__ == "__main__":
 
         # Check to see if same host was involved in two low bandwidth runs
         for host in hosts_results["bibw"]:
-            if "failures" in hosts_results["bibw"][host] and hosts_results["bibw"][host]["failures"] == True:
+            if "failures" not in hosts_results["bibw"][host]:
+                logging.debug("{} passed bibw check")
+            elif "failures" in hosts_results["bibw"][host] and hosts_results["bibw"][host]["failures"] == True:
                 logging.warning("Offline host: {}".format(host))
                 offline_nodes.append([host, "low ib bandwidth"])
-            else:
-                logging.info("Run an additional test on host {} to check ib bandwidth".format(host))
-                recheck_nodes.append([host, "bibw"])
         
         # Process output file results
         output = check_output('grep -T "IB0 Error:" osu_bw_test.o* | sort -n -k 2', shell=True)
