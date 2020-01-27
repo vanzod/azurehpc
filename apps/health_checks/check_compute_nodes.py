@@ -188,6 +188,99 @@ def collect_nodes(wlm="pbs", node_file=None):
         logging.info("WLM: {} is not supported".format(wlm))
         return {}
 
+def check_for_ib():
+    bad_nodes = list()
+    # Process output file results
+    output = check_output('grep -T "IB0 Error:" osu_bw_test.o* | sort -n -k 2', shell=True)
+    output = output.decode()
+    out_lines = output.split("\n")
+
+    # Check for ib0 on host
+    if len(out_lines) == 1 and out_lines[0] == "":
+        logging.info("All nodes have ib0 reporting in")
+    else:
+        for line in out_lines:
+            tmp = line.split()
+            host = tmp[2]
+            logging.warn("Offline host: {}".format(host))
+            bad_nodes.append([host, "no ib0"])
+    return bad_nodes
+        
+def check_ib_latency_results(cutoff_latency):
+    bad_nodes = list()
+    check_nodes = list()
+
+    # Process latency results
+    output = check_output('grep -T "^8 " *osu_latency* | sort -n -k 2', shell=True)
+    output = output.decode()
+
+    # Check IB for slow latency
+    hosts_results = check_nodes_for_ib_issues(output, "latency", cutoff_latency)
+    logging.info("Latency results: {}".format(hosts_results))
+
+    # Check to see if same host was involved in two slow runs
+    for host in hosts_results:
+        if "failures" not in hosts_results[host]:
+            logging.debug("{} passed latency check")
+        elif "failures" in hosts_results[host] and hosts_results[host]["failures"] > 1:
+            logging.warning("Offline host: {}".format(host))
+            bad_nodes.append([host, "Slow latency"])
+        else:
+            logging.info("Run an additional test on host {} to check".format(host))
+            check_nodes.append([host, "latency"])
+
+    # Run on additional check on questionable nodes
+
+    return bad_nodes
+
+def check_ib_bibw_results(cutoff_bibw):
+    bad_nodes = list()
+    # Process bibw results
+    output = check_output('grep -T "^4194304 " *osu_bw.log | sort -n -k 2', shell=True)
+    output = output.decode()
+
+    # Check IB for slow bibw
+    hosts_results["bibw"] = check_nodes_for_ib_issues(output, "bibw", cutoff_bibw)
+    logging.info("low ib bandwidth hosts: {}".format(hosts_results["bibw"]))
+
+    # Check to see if same host was involved in two low bandwidth runs
+    for host in hosts_results["bibw"]:
+        if "failures" not in hosts_results["bibw"][host]:
+            logging.debug("{} passed bibw check")
+        elif "failures" in hosts_results["bibw"][host] and hosts_results["bibw"][host]["failures"] > 1:
+            logging.warning("Offline host: {}".format(host))
+            bad_nodes.append([host, "low ib bandwidth"])
+        else:
+            logging.warning("Check host: {}".format(host))
+            check_nodes.append([host, "low ib bandwidth"])
+
+    # Run on additional check on questionable nodes
+
+    return bad_nodes
+
+def run_ib_jobs(node_dict=None, wlm="pbs", queue=None):
+    """ Submit IB test jobs """
+    nodes = list(node_dict.keys())
+    num_of_nodes = len(nodes)
+    logging.debug("# of Nodes: {}".format(num_of_nodes))
+    logging.debug("Nodes: {}".format(nodes))
+    logging.debug("{}".format(node_dict))
+
+    if num_of_nodes < 2:
+        logging.debug("Not enough nodes to run ib tests. Requires at least 2")
+        return False
+
+    for n_cnt, node in enumerate(nodes):
+        node1=node_dict[node]["host"]
+        if n_cnt+1 == num_of_nodes:
+            node2 = node_dict[nodes[0]]["host"]
+        else:
+            node2 = node_dict[nodes[n_cnt+1]]["host"]
+        logging.debug("Node1: {}, Node2: {}".format(node1, node2))
+        run_ib_tests(node1, node2, wlm, queue)
+        time.sleep(0.2)
+    return True
+
 if __name__ == "__main__":
     # Read in the script arguments
     logging.debug(sys.argv[1:])
@@ -210,12 +303,6 @@ if __name__ == "__main__":
     # Find all nodes
     node_dict = collect_nodes("pbs")
 
-    nodes = list(node_dict.keys())
-    num_of_nodes = len(nodes)
-    logging.debug("# of Nodes: {}".format(num_of_nodes))
-    logging.debug("Nodes: {}".format(nodes))
-    logging.debug("{}".format(node_dict))
-
     # Make dir to store results
     logging.debug("CWD: {}".format(os.getcwd()))
     new_dir = os.path.join(os.getcwd(), datetime.datetime.now().strftime('Health_tests_%Y%m%d_%H%M%S'))
@@ -229,69 +316,23 @@ if __name__ == "__main__":
     recheck_nodes = list()
     if args.ib_tests:
         logging.info("Run IB tests")
-        for n_cnt, node in enumerate(nodes):
-            node1=node_dict[node]["host"]
-            if n_cnt+1 == num_of_nodes:
-                node2 = node_dict[nodes[0]]["host"]
-            else:
-                node2 = node_dict[nodes[n_cnt+1]]["host"]
-            logging.debug("Node1: {}, Node2: {}".format(node1, node2))
-            run_ib_tests(node1, node2, args.wlm, args.q)
-            time.sleep(0.2)
+        run_ib_jobs(node_dict, args.wlm, args.q)
 
         # Wait for ib jobs to complete
         wait_for_jobs_to_finish("osu_bw_test", args.wlm)
-
-        # Process latency results
-        output = check_output('grep -T "^8 " *osu_latency* | sort -n -k 2', shell=True)
-        output = output.decode()
-
-        # Check IB for slow latency
-        hosts_results["latency"] = check_nodes_for_ib_issues(output, "latency", cutoff_latency)
-        logging.info("Latency results: {}".format(hosts_results["latency"]))
-
-        # Check to see if same host was involved in two slow runs
-        for host in hosts_results["latency"]:
-            if "failures" not in hosts_results["latency"][host]:
-                logging.debug("{} passed latency check")
-            elif "failures" in hosts_results["latency"][host] and hosts_results["latency"][host]["failures"] > 1:
-                logging.warning("Offline host: {}".format(host))
-                offline_nodes.append([host, "Slow latency"])
-            else:
-                logging.info("Run an additional test on host {} to check".format(host))
-                recheck_nodes.append([host, "latency"])
-
-        # Process bibw results
-        output = check_output('grep -T "^4194304 " *osu_bw.log | sort -n -k 2', shell=True)
-        output = output.decode()
-
-        # Check IB for slow latency
-        hosts_results["bibw"] = check_nodes_for_ib_issues(output, "bibw", cutoff_bibw)
-        logging.info("low ib bandwidth hosts: {}".format(hosts_results["bibw"]))
-
-        # Check to see if same host was involved in two low bandwidth runs
-        for host in hosts_results["bibw"]:
-            if "failures" not in hosts_results["bibw"][host]:
-                logging.debug("{} passed bibw check")
-            elif "failures" in hosts_results["bibw"][host] and hosts_results["bibw"][host]["failures"] == True:
-                logging.warning("Offline host: {}".format(host))
-                offline_nodes.append([host, "low ib bandwidth"])
         
-        # Process output file results
-        output = check_output('grep -T "IB0 Error:" osu_bw_test.o* | sort -n -k 2', shell=True)
-        output = output.decode()
-        out_lines = output.split("\n")
+        # Check latency results
+        bad_nodes = check_ib_latency_results(cutoff_latency)
+        offline_nodes = offline_nodes + bad_nodes
 
-        # Check for ib0 on host
-        if len(out_lines) == 1 and out_lines[0] == "":
-            logging.info("All nodes have ib0 reporting in")
-        else:
-            for line in out_lines:
-                tmp = line.split()
-                host = tmp[2]
-                logging.warn("Offline host: {}".format(host))
-                offline_nodes.append([host, "no ib0"])
-        
+        # Check bibw results
+        bad_nodes = check_ib_bibw_results(cutoff_bibw)
+        offline_nodes = offline_nodes + bad_nodes
+
+        # Check to see if ib0 is up on the nodes
+        bad_nodes = check_for_ib()       
+        offline_nodes = offline_nodes + bad_nodes
+
     logging.debug("Recheck nodes: {}".format(recheck_nodes))
 
     if args.mem_bw_tests:
