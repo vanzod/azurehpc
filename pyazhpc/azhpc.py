@@ -482,7 +482,7 @@ def _nodelist_expand(nodelist):
         resource_list.append(resource_name)
         resource_name = resource_name[:-4]
     return resource_name, resource_list
-    
+
 def do_slurm_suspend(args):
     log.debug(f"reading config file ({args.config_file})")
     
@@ -536,6 +536,10 @@ def do_slurm_resume(args):
     # first get the resource name
     resource_name, resource_list = _nodelist_expand(args.nodes)
     
+    # check if SKU supports premium disk
+
+    
+
     template_resource = config.get("resources", {}).get(resource_name)
     if not template_resource:
         log.error(f"{resource_name} resource not found in config")

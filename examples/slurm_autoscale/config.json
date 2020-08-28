@@ -6,8 +6,11 @@
   "variables": {
     "image": "OpenLogic:CentOS:7.6:latest",
     "hpc_image": "OpenLogic:CentOS-HPC:7.6:latest",
-    "vm_type": "Standard_D4s_v3",
-    "hb_vm_type": "Standard_HB60rs",
+    "headnode_vm_type": "Standard_D4s_v3",
+    "compute_vm_type": [
+      "Standard_HB60rs",
+      "Standard_HC44rs"
+    ],
     "instances": 2,
     "location": "eastus",
     "resource_group": "<NOT-SET>"
@@ -23,7 +26,7 @@
     "headnode": {
       "type": "vm",
       "public_ip": "true",
-      "vm_type": "Standard_D4s_v3",
+      "headnode_vm_type": "Standard_D4s_v3",
       "image": "variables.image",
       "accelerated_networking": "true",
       "managed_identity": {
@@ -43,7 +46,7 @@
    },
    "compute": {
       "type": "slurm_partition",
-      "vm_type": "variables.vm_type",
+      "compute_vm_type": "variables.vm_type",
       "instances": "variables.instances",
       "availability_set": "compute",
       "image": "variables.hpc_image",
