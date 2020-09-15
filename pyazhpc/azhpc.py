@@ -8,7 +8,6 @@ import socket
 import sys
 import textwrap
 import time
-import subprocess
 
 import arm
 import azconfig
